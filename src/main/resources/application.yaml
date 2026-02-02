@@ -1,0 +1,111 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: financial-service
+
+  cloud:
+    compatibility-verifier:
+      enabled: false  # ✅ Disable version check
+
+
+  main:
+    allow-bean-definition-overriding: false
+
+  data:
+    mongodb:
+      uri: mongodb+srv://educonnect:educonnect123@educonnect.sjmtr4c.mongodb.net/learning_management?retryWrites=true&w=majority&maxIdleTimeMS=60000&maxPoolSize=50&minPoolSize=10
+      database: learning_management
+      auto-index-creation: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: financial-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+
+# Eureka Service Discovery
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+# Payment Gateway Configuration
+payment:
+  stripe:
+    api-key: ${STRIPE_SECRET_KEY:sk_test_51Su9Hd2KyroM3brJw7msQHMT3mumCNyd3GuE3kNNLCPAqlhcljl9ajqNmrDkT5teXYD3qktw8yvlVgap62C6Wojy00dnA53xUU}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:pk_test_51Su9Hd2KyroM3brJExw3PFmDK0X8pSZV9W9JpvnmTTpz0P1ndA3aMJVTKFLOx7tjOqUtY8p5jIIOq8WX9RG4qJ3K00hcGb6iVW}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_fxlCtJPwYVSVCMR3kbIGaevgFkspeyLY}
+    api-version: "2023-10-16"
+
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:rzp_test_S1ine1s34el7Yi}
+    key-secret: ${RAZORPAY_KEY_SECRET:ER9Z8qr4IzKMJjdzPojTaL1C}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:your_razorpay_webhook_secret}
+    mock-mode: true
+    account-number: "2323230041234967"
+
+# Commission Configuration
+commission:
+  one-time: 0.20  # 20% commission for one-time bookings
+  recurring: 0.10  # 10% commission for recurring courses
+
+# Payout Configuration
+payout:
+  mock-mode: true
+  schedule:
+    day-of-week: MONDAY
+    hour: 9
+    minute: 0
+  minimum-amount: 1000
+
+# Refund Configuration
+refund:
+  cancellation-hours-threshold: 24
+  processing-fee-percentage: 0.02
+
+# Management & Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.tcon.financial_service: DEBUG
+    org.springframework.data.mongodb: INFO
+    org.springframework.kafka: INFO
+    com.stripe: DEBUG
+    com.razorpay: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

@@ -1,0 +1,14 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/tutoring_financial_dev_db
+
+payment:
+  stripe:
+    api-key: sk_test_dev_key
+  razorpay:
+    key-id: rzp_test_dev_key
+
+logging:
+  level:
+    com.tcon.financial: DEBUG

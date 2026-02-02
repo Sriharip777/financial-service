@@ -1,0 +1,249 @@
+package com.tcon.financial_service.payment.service;
+
+import com.tcon.financial_service.event.PaymentEventPublisher;
+import com.tcon.financial_service.payment.dto.PaymentDto;
+import com.tcon.financial_service.payment.dto.PaymentRequest;
+import com.tcon.financial_service.payment.dto.PaymentResponse;
+import com.tcon.financial_service.payment.entity.Payment;
+import com.tcon.financial_service.payment.entity.PaymentStatus;
+import com.tcon.financial_service.payment.gateway.PaymentGatewayFactory;
+import com.tcon.financial_service.payment.gateway.PaymentGatewayInterface;
+import com.tcon.financial_service.payment.repository.PaymentRepository;
+import com.tcon.financial_service.transaction.service.TransactionService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class PaymentService {
+
+    private final PaymentRepository paymentRepository;
+    private final PaymentGatewayFactory gatewayFactory;
+    private final CommissionCalculationService commissionService;
+    private final InstallmentService installmentService;
+    private final TransactionService transactionService;
+    private final PaymentEventPublisher eventPublisher;
+
+    @Transactional
+    public PaymentResponse createPayment(PaymentRequest request) {
+        log.info("==================== CREATE PAYMENT START ====================");
+
+        try {
+            // Step 1: Validate request
+            log.debug("Step 1: Validating request");
+            validatePaymentRequest(request);
+
+            // Step 2: Get payment gateway
+            log.debug("Step 2: Getting payment gateway: {}", request.getGateway());
+            PaymentGatewayInterface gateway = gatewayFactory.getGateway(request.getGateway());
+            if (gateway == null) {
+                throw new IllegalStateException("Payment gateway not found: " + request.getGateway());
+            }
+            log.info("✅ Payment gateway loaded: {}", request.getGateway());
+
+            // Step 3: Calculate commission
+            log.debug("Step 3: Calculating commission");
+            boolean isRecurring = request.getCourseId() != null &&
+                    Boolean.TRUE.equals(request.getIsInstallment());
+
+            BigDecimal commissionRate = commissionService.getCommissionRate(isRecurring);
+            BigDecimal commissionAmount = commissionService.calculateCommission(request.getAmount(), isRecurring);
+            BigDecimal teacherEarnings = commissionService.calculateTeacherEarnings(request.getAmount(), isRecurring);
+
+            log.info("✅ Commission calculated - Rate: {}, Amount: {}, Teacher Earnings: {}",
+                    commissionRate, commissionAmount, teacherEarnings);
+
+            // Step 4: Create payment intent at gateway
+            log.debug("Step 4: Creating payment intent at gateway");
+            PaymentResponse gatewayResponse = gateway.createPaymentIntent(request);
+            log.info("✅ Payment intent created - Gateway Payment ID: {}", gatewayResponse.getGatewayPaymentId());
+
+            // Step 5: Save payment to database
+            log.debug("Step 5: Saving payment to database");
+            Payment payment = buildPayment(request, gatewayResponse, commissionRate, commissionAmount, teacherEarnings);
+            payment = paymentRepository.save(payment);
+            log.info("✅ Payment saved - ID: {}, Order ID: {}", payment.getId(), payment.getOrderId());
+
+            // Step 6: Build response
+            log.debug("Step 6: Building response");
+            PaymentResponse response = buildPaymentResponse(payment, gatewayResponse);
+
+            log.info("==================== CREATE PAYMENT SUCCESS ====================");
+            return response;
+
+        } catch (Exception e) {
+            log.error("==================== CREATE PAYMENT FAILED ====================");
+            log.error("❌ Error Type: {}", e.getClass().getSimpleName());
+            log.error("❌ Error Message: {}", e.getMessage());
+            log.error("❌ Stack Trace:", e);
+            throw new RuntimeException("Failed to create payment: " + e.getMessage(), e);
+        }
+    }
+
+    private void validatePaymentRequest(PaymentRequest request) {
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Invalid amount: " + request.getAmount());
+        }
+        if (request.getBookingId() == null || request.getBookingId().isEmpty()) {
+            throw new IllegalArgumentException("Booking ID is required");
+        }
+        if (request.getStudentId() == null || request.getStudentId().isEmpty()) {
+            throw new IllegalArgumentException("Student ID is required");
+        }
+        if (request.getTeacherId() == null || request.getTeacherId().isEmpty()) {
+            throw new IllegalArgumentException("Teacher ID is required");
+        }
+        if (request.getGateway() == null) {
+            throw new IllegalArgumentException("Payment gateway is required");
+        }
+        if (request.getPaymentMethod() == null) {
+            throw new IllegalArgumentException("Payment method is required");
+        }
+        log.info("✅ Request validation passed");
+    }
+
+    private Payment buildPayment(PaymentRequest request, PaymentResponse gatewayResponse,
+                                 BigDecimal commissionRate, BigDecimal commissionAmount,
+                                 BigDecimal teacherEarnings) {
+        return Payment.builder()
+                .orderId(gatewayResponse.getOrderId())
+                .bookingId(request.getBookingId())
+                .studentId(request.getStudentId())
+                .teacherId(request.getTeacherId())
+                .courseId(request.getCourseId())
+                .amount(request.getAmount())
+                .currency(request.getCurrency())
+                .status(PaymentStatus.PENDING)
+                .paymentMethod(request.getPaymentMethod())
+                .gateway(request.getGateway())
+                .gatewayPaymentId(gatewayResponse.getGatewayPaymentId())
+                .commissionRate(commissionRate)
+                .commissionAmount(commissionAmount)
+                .teacherEarnings(teacherEarnings)
+                .isInstallment(Boolean.TRUE.equals(request.getIsInstallment()))
+                .installmentNumber(Boolean.TRUE.equals(request.getIsInstallment()) ? 1 : null)
+                .totalInstallments(request.getTotalInstallments())
+                .description(request.getDescription())
+                .receiptEmail(request.getReceiptEmail())
+                .metadata(request.getMetadata())
+                .build();
+    }
+
+    private PaymentResponse buildPaymentResponse(Payment payment, PaymentResponse gatewayResponse) {
+        return PaymentResponse.builder()
+                .paymentId(payment.getId())
+                .orderId(payment.getOrderId())
+                .bookingId(payment.getBookingId())
+                .studentId(payment.getStudentId())
+                .teacherId(payment.getTeacherId())
+                .amount(payment.getAmount())
+                .currency(payment.getCurrency())
+                .status(payment.getStatus())
+                .gateway(payment.getGateway())
+                .gatewayPaymentId(payment.getGatewayPaymentId())
+                .clientSecret(gatewayResponse.getClientSecret())
+                .checkoutUrl(gatewayResponse.getCheckoutUrl())
+                .nextAction(gatewayResponse.getNextAction())
+                .commissionAmount(payment.getCommissionAmount())
+                .teacherEarnings(payment.getTeacherEarnings())
+                .description(payment.getDescription())
+                .createdAt(payment.getCreatedAt())
+                .build();
+    }
+
+    @Transactional
+    public PaymentDto confirmPayment(String paymentId) {
+        log.info("Confirming payment: {}", paymentId);
+
+        Payment payment = getPaymentById(paymentId);
+
+        if (payment.getStatus() == PaymentStatus.COMPLETED) {
+            log.warn("Payment already completed: {}", paymentId);
+            return mapToDto(payment);
+        }
+
+        payment.setStatus(PaymentStatus.COMPLETED);
+        payment.setCompletedAt(LocalDateTime.now());
+        payment = paymentRepository.save(payment);
+
+        transactionService.createPaymentTransaction(payment);
+
+        if (Boolean.TRUE.equals(payment.getIsInstallment())) {
+            installmentService.updateInstallmentProgress(payment);
+        }
+
+        eventPublisher.publishPaymentCompleted(payment);
+
+        log.info("Payment confirmed successfully: {}", paymentId);
+        return mapToDto(payment);
+    }
+
+    @Transactional
+    public PaymentDto failPayment(String paymentId, String reason) {
+        log.info("Failing payment: {}, Reason: {}", paymentId, reason);
+
+        Payment payment = getPaymentById(paymentId);
+        payment.setStatus(PaymentStatus.FAILED);
+        payment.setFailureReason(reason);
+        payment = paymentRepository.save(payment);
+
+        eventPublisher.publishPaymentFailed(payment);
+
+        log.info("Payment failed: {}", paymentId);
+        return mapToDto(payment);
+    }
+
+    public PaymentDto getPayment(String paymentId) {
+        Payment payment = getPaymentById(paymentId);
+        return mapToDto(payment);
+    }
+
+    public Page<PaymentDto> getPaymentsByStudent(String studentId, Pageable pageable) {
+        Page<Payment> payments = paymentRepository.findByStudentId(studentId, pageable);
+        return payments.map(this::mapToDto);
+    }
+
+    public Page<PaymentDto> getPaymentsByTeacher(String teacherId, Pageable pageable) {
+        Page<Payment> payments = paymentRepository.findByTeacherId(teacherId, pageable);
+        return payments.map(this::mapToDto);
+    }
+
+    private Payment getPaymentById(String paymentId) {
+        return paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + paymentId));
+    }
+
+    private PaymentDto mapToDto(Payment payment) {
+        return PaymentDto.builder()
+                .id(payment.getId())
+                .orderId(payment.getOrderId())
+                .bookingId(payment.getBookingId())
+                .studentId(payment.getStudentId())
+                .teacherId(payment.getTeacherId())
+                .amount(payment.getAmount())
+                .currency(payment.getCurrency())
+                .status(payment.getStatus())
+                .paymentMethod(payment.getPaymentMethod())
+                .gateway(payment.getGateway())
+                .gatewayPaymentId(payment.getGatewayPaymentId())
+                .commissionRate(payment.getCommissionRate())
+                .commissionAmount(payment.getCommissionAmount())
+                .teacherEarnings(payment.getTeacherEarnings())
+                .isInstallment(payment.getIsInstallment())
+                .installmentNumber(payment.getInstallmentNumber())
+                .totalInstallments(payment.getTotalInstallments())
+                .description(payment.getDescription())
+                .failureReason(payment.getFailureReason())
+                .createdAt(payment.getCreatedAt())
+                .completedAt(payment.getCompletedAt())
+                .build();
+    }
+}
