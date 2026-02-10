@@ -62,7 +62,7 @@ payment:
     key-id: ${RAZORPAY_KEY_ID:rzp_test_S1ine1s34el7Yi}
     key-secret: ${RAZORPAY_KEY_SECRET:ER9Z8qr4IzKMJjdzPojTaL1C}
     webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:your_razorpay_webhook_secret}
-    mock-mode: true
+    mock-mode: false
     account-number: "2323230041234967"
 
 # Commission Configuration

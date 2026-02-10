@@ -20,21 +20,33 @@ public class PaymentEventPublisher {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void publishPaymentCompleted(Payment payment) {
-        log.info("Publishing payment completed event: {}", payment.getId());
+        try {
+            log.info("📤 Publishing payment completed event to Kafka: {}", payment.getId());
+            log.info("🎫 Booking ID: {}", payment.getBookingId());
 
-        Map<String, Object> event = new HashMap<>();
-        event.put("eventType", "PAYMENT_COMPLETED");
-        event.put("paymentId", payment.getId());
-        event.put("bookingId", payment.getBookingId());
-        event.put("studentId", payment.getStudentId());
-        event.put("teacherId", payment.getTeacherId());
-        event.put("amount", payment.getAmount());
-        event.put("currency", payment.getCurrency());
-        event.put("teacherEarnings", payment.getTeacherEarnings());
-        event.put("timestamp", payment.getCompletedAt());
+            Map<String, Object> event = new HashMap<>();
+            event.put("eventType", "PAYMENT_COMPLETED");
+            event.put("paymentId", payment.getId());
+            event.put("bookingId", payment.getBookingId());
+            event.put("studentId", payment.getStudentId());
+            event.put("teacherId", payment.getTeacherId());
+            event.put("amount", payment.getAmount());
+            event.put("currency", payment.getCurrency());
+            event.put("teacherEarnings", payment.getTeacherEarnings());
+            event.put("timestamp", payment.getCompletedAt());
 
-        kafkaTemplate.send("payment-completed", payment.getId(), event);
+            log.info("📦 Event payload: {}", event);
+
+            kafkaTemplate.send("payment-completed", payment.getBookingId(), event);
+
+            log.info("✅ Event sent to Kafka topic: payment-completed");
+
+        } catch (Exception e) {
+            log.error("❌ Failed to publish payment completed event", e);
+            throw e; // Re-throw to see the error
+        }
     }
+
 
     public void publishPaymentFailed(Payment payment) {
         log.info("Publishing payment failed event: {}", payment.getId());

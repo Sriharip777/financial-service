@@ -33,16 +33,28 @@ public class PaymentController {
     @PostMapping
     public ResponseEntity<?> createPayment(@Valid @RequestBody PaymentRequest request) {
         try {
-            log.info("=== CREATE PAYMENT REQUEST ===");
+            log.info("==================== CREATE PAYMENT REQUEST ====================");
             log.info("Booking: {}, Student: {}, Teacher: {}",
                     request.getBookingId(), request.getStudentId(), request.getTeacherId());
-            log.info("Amount: {} {}, Gateway: {}",
-                    request.getAmount(), request.getCurrency(), request.getGateway());
+            log.info("Amount: {} {}, Gateway: {}, Method: {}",
+                    request.getAmount(), request.getCurrency(),
+                    request.getGateway(), request.getPaymentMethod());
+
+            // ✅ Validate gateway
+            if (request.getGateway() == null) {
+                log.error("❌ Payment gateway is required");
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Validation Error");
+                error.put("message", "Payment gateway is required");
+                error.put("status", 400);
+                return ResponseEntity.badRequest().body(error);
+            }
 
             PaymentResponse response = paymentService.createPayment(request);
 
-            log.info("=== PAYMENT CREATED SUCCESSFULLY ===");
+            log.info("==================== PAYMENT CREATED SUCCESSFULLY ====================");
             log.info("Payment ID: {}, Order ID: {}", response.getPaymentId(), response.getOrderId());
+            log.info("Gateway Payment ID: {}", response.getGatewayPaymentId());
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
@@ -64,8 +76,23 @@ public class PaymentController {
             error.put("timestamp", java.time.LocalDateTime.now());
             return ResponseEntity.badRequest().body(error);
 
+        } catch (com.mongodb.MongoWriteException e) {
+            log.error("❌ MongoDB Write Error - Likely duplicate key", e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Database Error");
+            error.put("message", "A payment with this order ID already exists. Please try again.");
+            error.put("status", 409);
+            error.put("timestamp", java.time.LocalDateTime.now());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+
         } catch (Exception e) {
             log.error("❌ Payment creation failed - Unexpected Error", e);
+            log.error("❌ Error Type: {}", e.getClass().getName());
+            log.error("❌ Error Message: {}", e.getMessage());
+
+            // Log full stack trace
+            e.printStackTrace();
+
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Internal Server Error");
             error.put("message", e.getMessage());
