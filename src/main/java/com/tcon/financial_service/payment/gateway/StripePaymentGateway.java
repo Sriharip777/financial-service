@@ -38,7 +38,7 @@ public class StripePaymentGateway implements PaymentGatewayInterface {
         log.info("Creating Stripe Payment Intent for booking: {}", request.getBookingId());
 
         try {
-            // Convert amount to smallest currency unit (paise for INR, cents for USD)
+            // Convert amount to smallest currency unit
             long amountInSmallestUnit = request.getAmount()
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(0, RoundingMode.HALF_UP)
@@ -73,22 +73,18 @@ public class StripePaymentGateway implements PaymentGatewayInterface {
                 paramsBuilder.setReceiptEmail(request.getReceiptEmail());
             }
 
-            // Add payment method types
+            // ✅ Only add card payment method (UPI not supported)
             paramsBuilder.addPaymentMethodType("card");
-
-            // Add UPI for INR payments
-            if ("INR".equalsIgnoreCase(request.getCurrency())) {
-                paramsBuilder.addPaymentMethodType("upi");
-            }
 
             PaymentIntentCreateParams params = paramsBuilder.build();
             PaymentIntent paymentIntent = PaymentIntent.create(params, stripeRequestOptions);
 
             log.info("Stripe Payment Intent created successfully: {}", paymentIntent.getId());
 
+            // ✅ Use PaymentIntent ID as orderId instead of bookingId
             return PaymentResponse.builder()
                     .gatewayPaymentId(paymentIntent.getId())
-                    .orderId(request.getBookingId())
+                    .orderId(paymentIntent.getId())  // ✅ Use unique Stripe PI ID
                     .bookingId(request.getBookingId())
                     .studentId(request.getStudentId())
                     .teacherId(request.getTeacherId())
@@ -108,6 +104,7 @@ public class StripePaymentGateway implements PaymentGatewayInterface {
             throw e;
         }
     }
+
 
     @Override
     public PaymentResponse capturePayment(String paymentIntentId) throws StripeException {

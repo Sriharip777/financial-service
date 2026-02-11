@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -163,27 +164,76 @@ public class PaymentService {
     public PaymentDto confirmPayment(String paymentId) {
         log.info("Confirming payment: {}", paymentId);
 
-        Payment payment = getPaymentById(paymentId);
+        Payment payment = findPaymentByAnyId(paymentId);
 
         if (payment.getStatus() == PaymentStatus.COMPLETED) {
             log.warn("Payment already completed: {}", paymentId);
             return mapToDto(payment);
         }
 
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Cannot confirm payment with status: " + payment.getStatus());
+        }
+
         payment.setStatus(PaymentStatus.COMPLETED);
         payment.setCompletedAt(LocalDateTime.now());
         payment = paymentRepository.save(payment);
 
+        // ✅ Create transaction
         transactionService.createPaymentTransaction(payment);
 
+        // ✅ Handle installments if needed
         if (Boolean.TRUE.equals(payment.getIsInstallment())) {
             installmentService.updateInstallmentProgress(payment);
         }
 
-        eventPublisher.publishPaymentCompleted(payment);
+        // ✅✅✅ PUBLISH KAFKA EVENT - ADD TRY-CATCH FOR DEBUGGING
+        try {
+            log.info("📤 About to publish Kafka event for payment: {}", payment.getId());
+            eventPublisher.publishPaymentCompleted(payment);
+            log.info("✅ Kafka event publish call completed");
+        } catch (Exception e) {
+            log.error("❌ Failed to publish Kafka event", e);
+        }
 
         log.info("Payment confirmed successfully: {}", paymentId);
         return mapToDto(payment);
+    }
+
+
+    // ✅ Add this new method
+    private Payment findPaymentByAnyId(String identifier) {
+        log.debug("Looking up payment by identifier: {}", identifier);
+
+        // Try by MongoDB ID first
+        Optional<Payment> payment = paymentRepository.findById(identifier);
+        if (payment.isPresent()) {
+            log.debug("✅ Found payment by ID: {}", identifier);
+            return payment.get();
+        }
+
+        // Try by gateway payment ID (Stripe PaymentIntent ID or Razorpay Order ID)
+        payment = paymentRepository.findByGatewayPaymentId(identifier);
+        if (payment.isPresent()) {
+            log.debug("✅ Found payment by gateway payment ID: {}", identifier);
+            return payment.get();
+        }
+
+        // Try by order ID
+        payment = paymentRepository.findByOrderId(identifier);
+        if (payment.isPresent()) {
+            log.debug("✅ Found payment by order ID: {}", identifier);
+            return payment.get();
+        }
+
+        // Not found by any identifier
+        log.error("❌ Payment not found for identifier: {}", identifier);
+        throw new IllegalArgumentException("Payment not found: " + identifier);
+    }
+
+    // ✅ Update getPaymentById to use the new method
+    private Payment getPaymentById(String paymentId) {
+        return findPaymentByAnyId(paymentId);
     }
 
     @Transactional
@@ -214,11 +264,6 @@ public class PaymentService {
     public Page<PaymentDto> getPaymentsByTeacher(String teacherId, Pageable pageable) {
         Page<Payment> payments = paymentRepository.findByTeacherId(teacherId, pageable);
         return payments.map(this::mapToDto);
-    }
-
-    private Payment getPaymentById(String paymentId) {
-        return paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + paymentId));
     }
 
     private PaymentDto mapToDto(Payment payment) {
