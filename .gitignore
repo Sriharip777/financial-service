@@ -1,42 +1,60 @@
-# Maven
+# Compiled class files & JARs
+*.jar
+*.class
 target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+**/target/
+build/
+**/build/
 
-# IntelliJ IDEA
+# Logs (CRITICAL - Prevents git conflicts!)
+logs/
+**/logs/
+*.log
+logs/api-gateway.log.*
+*.gz
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# IDEs
 .idea/
 *.iws
 *.iml
 *.ipr
-
-# Eclipse
-.apt_generated
 .classpath
 .factorypath
 .project
-.settings
-.springBeans
+.settings/
 .sts4-cache
-
-# VS Code
 .vscode/
+.nbproject/private/
+**/src/main/**/target/
+**/src/test/**/target/
 
-# macOS
+# OS
 .DS_Store
-
-# Windows
 Thumbs.db
 
-# Logs
-*.log
-logs/
-
-# Environment variables
+# Environment
 .env
-.env.local
-application-secrets.yml
+*.env
+!.env.example
 
-# Secrets
-*-secrets.yml
-secrets.properties
+# Database
+*.db
+*.mdb
+*.sqlite
+
+# Docker
+.dockerignore
+
+# Node (if frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
