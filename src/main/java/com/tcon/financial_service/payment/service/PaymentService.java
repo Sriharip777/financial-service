@@ -1,5 +1,4 @@
 package com.tcon.financial_service.payment.service;
-
 import com.tcon.financial_service.event.PaymentEventPublisher;
 import com.tcon.financial_service.payment.dto.PaymentDto;
 import com.tcon.financial_service.payment.dto.PaymentRequest;
@@ -16,7 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -93,8 +91,10 @@ public class PaymentService {
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Invalid amount: " + request.getAmount());
         }
-        if (request.getBookingId() == null || request.getBookingId().isEmpty()) {
-            throw new IllegalArgumentException("Booking ID is required");
+        // CHANGE: Either bookingId OR courseId must be present
+        if ((request.getBookingId() == null || request.getBookingId().isEmpty()) &&
+                (request.getCourseId() == null || request.getCourseId().isEmpty())) {
+            throw new IllegalArgumentException("Either Booking ID or Course ID is required");
         }
         if (request.getStudentId() == null || request.getStudentId().isEmpty()) {
             throw new IllegalArgumentException("Student ID is required");
