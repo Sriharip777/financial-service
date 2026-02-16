@@ -1,5 +1,4 @@
 package com.tcon.financial_service.payment.dto;
-
 import com.tcon.financial_service.payment.entity.PaymentFrequency;
 import com.tcon.financial_service.payment.entity.PaymentGateway;
 import com.tcon.financial_service.payment.entity.PaymentMethod;
@@ -20,7 +19,6 @@ import java.util.Map;
 @AllArgsConstructor
 public class PaymentRequest {
 
-    @NotBlank(message = "Booking ID is required")
     private String bookingId;
 
     @NotBlank(message = "Student ID is required")

@@ -1,6 +1,4 @@
 package com.tcon.financial_service.event;
-
-
 import com.tcon.financial_service.payment.entity.Payment;
 import com.tcon.financial_service.payout.entity.Payout;
 import com.tcon.financial_service.refund.entity.Refund;
@@ -23,11 +21,13 @@ public class PaymentEventPublisher {
         try {
             log.info("📤 Publishing payment completed event to Kafka: {}", payment.getId());
             log.info("🎫 Booking ID: {}", payment.getBookingId());
+            log.info("🎓 Course ID: {}", payment.getCourseId());
 
             Map<String, Object> event = new HashMap<>();
             event.put("eventType", "PAYMENT_COMPLETED");
             event.put("paymentId", payment.getId());
-            event.put("bookingId", payment.getBookingId());
+            event.put("bookingId", payment.getBookingId()); // May be null for course enrollment
+            event.put("courseId", payment.getCourseId());   // ADD THIS
             event.put("studentId", payment.getStudentId());
             event.put("teacherId", payment.getTeacherId());
             event.put("amount", payment.getAmount());
@@ -37,15 +37,18 @@ public class PaymentEventPublisher {
 
             log.info("📦 Event payload: {}", event);
 
-            kafkaTemplate.send("payment-completed", payment.getBookingId(), event);
+            // ✅ Use paymentId as key if bookingId is null
+            String key = payment.getBookingId() != null ? payment.getBookingId() : payment.getId();
+            kafkaTemplate.send("payment-completed", key, event);
 
             log.info("✅ Event sent to Kafka topic: payment-completed");
 
         } catch (Exception e) {
             log.error("❌ Failed to publish payment completed event", e);
-            throw e; // Re-throw to see the error
+            throw e;
         }
     }
+
 
 
     public void publishPaymentFailed(Payment payment) {
