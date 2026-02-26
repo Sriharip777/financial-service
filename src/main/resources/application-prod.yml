@@ -3,21 +3,25 @@ server:
 
 spring:
   application:
-    name: financial-service
+    name: FINANCIAL-SERVICE
+
+  main:
+    allow-bean-definition-overriding: false
+
   cloud:
     compatibility-verifier:
       enabled: false
-  main:
-    allow-bean-definition-overriding: false
+
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI}
-      database: learning_management
+      uri: ${MONGODB_URI}
+      database: ${MONGODB_DATABASE:learning_management}
       auto-index-creation: true
+
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAPSERVERS}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: financial-service-group
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:financial-service-group}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -26,6 +30,7 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -33,15 +38,24 @@ spring:
 
 eureka:
   client:
-    service-url:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
+    enabled: ${EUREKA_ENABLED:true}
     register-with-eureka: true
     fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_URL:https://educonservicediscovery-64307221061.asia-south1.run.app/eureka/}
+    registry-fetch-interval-seconds: 15
   instance:
-    prefer-ip-address: true
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+    prefer-ip-address: false
+    instance-id: ${EUREKA_INSTANCE_HOSTNAME:localhost}:${server.port}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
+    non-secure-port-enabled: false
+    secure-port-enabled: true
+    secure-port: 443
+    home-page-url: https://${eureka.instance.hostname}/
+    status-page-url: https://${eureka.instance.hostname}/actuator/info
+    health-check-url: https://${eureka.instance.hostname}/actuator/health
 
 payment:
   stripe:
@@ -49,19 +63,20 @@ payment:
     publishable-key: ${STRIPE_PUBLISHABLE_KEY}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET}
     api-version: "2023-10-16"
+
   razorpay:
     key-id: ${RAZORPAY_KEY_ID}
     key-secret: ${RAZORPAY_KEY_SECRET}
     webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
-    mock-mode: false
-    account-number: "2323230041234967"
+    mock-mode: ${RAZORPAY_MOCK_MODE:false}
+    account-number: ${RAZORPAY_ACCOUNT_NUMBER:2323230041234967}
 
 commission:
   one-time: 0.20
   recurring: 0.10
 
 payout:
-  mock-mode: true
+  mock-mode: ${PAYOUT_MOCK_MODE:true}
   schedule:
     day-of-week: MONDAY
     hour: 9
@@ -72,7 +87,6 @@ refund:
   cancellation-hours-threshold: 24
   processing-fee-percentage: 0.02
 
-# Hardcoded — no commas problem
 management:
   endpoints:
     web:
