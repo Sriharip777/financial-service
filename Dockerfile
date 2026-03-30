@@ -18,7 +18,6 @@ RUN ./mvnw dependency:go-offline -B -q
 COPY src ./src
 RUN ./mvnw clean package -DskipTests=true -B -q
 
-
 # ================================
 # Runtime stage                   ← named so --target works
 # ================================
