@@ -1,12 +1,21 @@
 server:
   port: ${PORT:8085}
+  shutdown: graceful
+  forward-headers-strategy: framework
 
 spring:
   application:
-    name: FINANCIAL-SERVICE
+    name: financial-service
 
   main:
     allow-bean-definition-overriding: false
+
+  output:
+    ansi:
+      enabled: NEVER
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
   cloud:
     compatibility-verifier:
@@ -19,17 +28,33 @@ spring:
       auto-index-creation: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP_ID:financial-service-group}
       auto-offset-reset: earliest
+      enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
+        spring.json.trusted.packages: ${KAFKA_TRUSTED_PACKAGES:*}
+        session.timeout.ms: 60000
+        heartbeat.interval.ms: 20000
+        max.poll.interval.ms: 300000
+        max.poll.records: 10
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        retry.backoff.ms: 1000
+        max.in.flight.requests.per.connection: 1
+    properties:
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+      request.timeout.ms: 30000
+      connections.max.idle.ms: 540000
+      reconnect.backoff.ms: 1000
+      reconnect.backoff.max.ms: 10000
 
   jackson:
     serialization:
@@ -42,50 +67,55 @@ eureka:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: ${EUREKA_URL:https://educonservicediscovery-64307221061.asia-south1.run.app/eureka/}
+      defaultZone: ${EUREKA_URL}
     registry-fetch-interval-seconds: 15
+    eureka-server-connect-timeout-seconds: 10
+    eureka-server-read-timeout-seconds: 10
+    healthcheck:
+      enabled: false
+
   instance:
-    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME}
     prefer-ip-address: false
-    instance-id: ${EUREKA_INSTANCE_HOSTNAME:localhost}:${server.port}
-    lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 30
+    instance-id: ${spring.application.name}:${eureka.instance.hostname}
     non-secure-port-enabled: false
     secure-port-enabled: true
     secure-port: 443
     home-page-url: https://${eureka.instance.hostname}/
     status-page-url: https://${eureka.instance.hostname}/actuator/info
     health-check-url: https://${eureka.instance.hostname}/actuator/health
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 90
 
 payment:
   stripe:
     api-key: ${STRIPE_SECRET_KEY}
     publishable-key: ${STRIPE_PUBLISHABLE_KEY}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET}
-    api-version: "2023-10-16"
+    api-version: ${STRIPE_API_VERSION:2023-10-16}
 
   razorpay:
     key-id: ${RAZORPAY_KEY_ID}
     key-secret: ${RAZORPAY_KEY_SECRET}
     webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
     mock-mode: ${RAZORPAY_MOCK_MODE:false}
-    account-number: ${RAZORPAY_ACCOUNT_NUMBER:2323230041234967}
+    account-number: ${RAZORPAY_ACCOUNT_NUMBER}
 
 commission:
-  one-time: 0.20
-  recurring: 0.10
+  one-time: ${COMMISSION_ONE_TIME:0.20}
+  recurring: ${COMMISSION_RECURRING:0.10}
 
 payout:
   mock-mode: ${PAYOUT_MOCK_MODE:true}
   schedule:
-    day-of-week: MONDAY
-    hour: 9
-    minute: 0
-  minimum-amount: 1000
+    day-of-week: ${PAYOUT_DAY_OF_WEEK:MONDAY}
+    hour: ${PAYOUT_HOUR:9}
+    minute: ${PAYOUT_MINUTE:0}
+  minimum-amount: ${PAYOUT_MINIMUM_AMOUNT:1000}
 
 refund:
-  cancellation-hours-threshold: 24
-  processing-fee-percentage: 0.02
+  cancellation-hours-threshold: ${REFUND_CANCELLATION_HOURS_THRESHOLD:24}
+  processing-fee-percentage: ${REFUND_PROCESSING_FEE_PERCENTAGE:0.02}
 
 management:
   endpoints:
@@ -96,20 +126,24 @@ management:
   endpoint:
     health:
       show-details: always
+      show-components: always
+  health:
+    mongo:
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
 
 logging:
   level:
-    root: INFO
-    com.tcon.api_gateway: DEBUG
-    org.springframework.cloud.gateway: INFO
-    org.springframework.cloud.gateway.handler.RoutePredicateHandlerMapping: DEBUG
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.tcon.financialservice: ${LOG_LEVEL_APP:INFO}
     org.springframework.cloud.loadbalancer: WARN
-    io.github.resilience4j: INFO
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN
+    com.netflix.discovery: WARN
     reactor.netty: WARN
     io.netty: ERROR
-    org.springframework.data.redis: INFO
+    org.springframework.data.mongodb.core.MongoTemplate: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
