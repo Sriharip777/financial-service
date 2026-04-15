@@ -1,5 +1,10 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# FINANCIAL-SERVICE — PRODUCTION
+# ══════════════════════════════════════════════════════════════════════════════
+
 server:
-  port: ${PORT:8085}
+  # ✅ FIX: default 8080 not 8085 — Cloud Run always injects PORT=8080
+  port: ${PORT:8080}
   shutdown: graceful
   forward-headers-strategy: framework
 
@@ -75,6 +80,7 @@ eureka:
       enabled: false
 
   instance:
+    # ✅ Plain hostname only — no https://, no /eureka/ suffix
     hostname: ${EUREKA_INSTANCE_HOSTNAME}
     prefer-ip-address: false
     instance-id: ${spring.application.name}:${eureka.instance.hostname}
@@ -86,6 +92,7 @@ eureka:
     health-check-url: https://${eureka.instance.hostname}/actuator/health
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 90
+    initial-status: UP
 
 payment:
   stripe:
@@ -106,6 +113,7 @@ commission:
   recurring: ${COMMISSION_RECURRING:0.10}
 
 payout:
+  # ✅ FIX: default true so app starts even if PAYOUT_MOCK_MODE not set
   mock-mode: ${PAYOUT_MOCK_MODE:true}
   schedule:
     day-of-week: ${PAYOUT_DAY_OF_WEEK:MONDAY}
