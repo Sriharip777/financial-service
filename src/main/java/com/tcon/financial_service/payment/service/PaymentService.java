@@ -135,6 +135,7 @@ public class PaymentService {
                 .description(request.getDescription())
                 .receiptEmail(request.getReceiptEmail())
                 .metadata(request.getMetadata())
+                .isNegotiated(request.getIsNegotiated()) // ✅ NEW FIELD
                 .build();
     }
 
@@ -165,6 +166,82 @@ public class PaymentService {
         log.info("Confirming payment: {}", paymentId);
 
         Payment payment = findPaymentByAnyId(paymentId);
+
+        // ================= NEW GATEWAY FEE LOGIC =================
+
+        PaymentGatewayInterface gateway = gatewayFactory.getGateway(payment.getGateway());
+
+        PaymentResponse gatewayResponse;
+        try {
+            gatewayResponse = gateway.capturePayment(payment.getGatewayPaymentId());
+        } catch (Exception e) {
+            log.error("❌ Error while capturing payment from gateway", e);
+            throw new RuntimeException("Payment capture failed: " + e.getMessage(), e);
+        }
+
+// Amount from gateway
+        BigDecimal amount = gatewayResponse.getAmount();
+
+// Gateway fee
+        BigDecimal gatewayFee = gatewayResponse.getGatewayFee() != null
+                ? gatewayResponse.getGatewayFee()
+                : BigDecimal.ZERO;
+
+// Net amount
+        BigDecimal netAmount = amount.subtract(gatewayFee);
+
+// Determine commission type
+        boolean isRecurring = payment.getCourseId() != null &&
+                Boolean.TRUE.equals(payment.getIsInstallment());
+
+// Platform fee calculation
+        BigDecimal commissionRate = commissionService.getCommissionRate(isRecurring);
+        BigDecimal platformFee = commissionService.calculateCommission(netAmount, isRecurring);
+
+// Teacher earnings
+        BigDecimal teacherEarnings = netAmount.subtract(platformFee);
+
+        // ================= NEGOTIATION LOGIC (ADDED ONLY) =================
+
+// Override using negotiation (if applicable)
+        Boolean isNegotiated = payment.getIsNegotiated();
+
+        BigDecimal newPlatformRate = commissionService.getPlatformFeeRate(isNegotiated);
+
+        BigDecimal newPlatformFee = commissionService.calculatePlatformFee(
+                netAmount,
+                isNegotiated
+        );
+
+        BigDecimal newTeacherEarnings = commissionService.calculateTeacherEarnings(
+                netAmount,
+                isNegotiated
+        );
+
+// Override values safely (no removal of old logic)
+        commissionRate = newPlatformRate;
+        platformFee = newPlatformFee;
+        teacherEarnings = newTeacherEarnings;
+
+// ================= END =================
+
+// Set NEW fields (no removal of old ones)
+        payment.setGatewayFee(gatewayFee);
+        payment.setGatewayFeePercentage(gatewayResponse.getGatewayFeePercentage());
+        payment.setNetAmount(netAmount);
+
+        payment.setPlatformFee(platformFee);
+        payment.setPlatformFeePercentage(commissionRate);
+
+// Override safely (backward compatibility)
+        payment.setCommissionRate(commissionRate);
+        payment.setCommissionAmount(platformFee);
+        payment.setTeacherEarnings(teacherEarnings);
+
+// Optional: update amount from gateway
+        payment.setAmount(amount);
+
+// ================= END NEW LOGIC =================
 
         if (payment.getStatus() == PaymentStatus.COMPLETED) {
             log.warn("Payment already completed: {}", paymentId);
@@ -282,6 +359,9 @@ public class PaymentService {
                 .commissionRate(payment.getCommissionRate())
                 .commissionAmount(payment.getCommissionAmount())
                 .teacherEarnings(payment.getTeacherEarnings())
+                .gatewayFee(payment.getGatewayFee())
+                .netAmount(payment.getNetAmount())
+                .platformFee(payment.getPlatformFee())
                 .isInstallment(payment.getIsInstallment())
                 .installmentNumber(payment.getInstallmentNumber())
                 .totalInstallments(payment.getTotalInstallments())

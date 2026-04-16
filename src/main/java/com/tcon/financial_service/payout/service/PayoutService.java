@@ -1,12 +1,14 @@
 package com.tcon.financial_service.payout.service;
 
 import com.tcon.financial_service.event.PaymentEventPublisher;
-import com.tcon.financial_service.payout.entity.PayoutStatus; // ✅ Fixed: moved from payment package
+import com.tcon.financial_service.payout.entity.PayoutStatus;
 import com.tcon.financial_service.payout.dto.PayoutDto;
 import com.tcon.financial_service.payout.dto.PayoutRequest;
 import com.tcon.financial_service.payout.entity.Payout;
 import com.tcon.financial_service.payout.repository.PayoutRepository;
-import com.tcon.financial_service.transaction.service.TransactionService; // ✅ Fixed: correct import
+import com.tcon.financial_service.transaction.service.TransactionService;
+import com.tcon.financial_service.earnings.entity.TeacherEarnings;
+import com.tcon.financial_service.earnings.repository.TeacherEarningsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,14 +30,16 @@ public class PayoutService {
     private final PayoutRepository payoutRepository;
     private final EarningsCalculationService earningsService;
     private final BankTransferService bankTransferService;
-    private final TransactionService transactionService; // ✅ Now correctly references your TransactionService
+    private final TransactionService transactionService;
     private final PaymentEventPublisher eventPublisher;
+
+    // ✅ NEW
+    private final TeacherEarningsRepository teacherEarningsRepository;
 
     @Transactional
     public PayoutDto createPayout(PayoutRequest request) throws Exception {
         log.info("Creating payout for teacher: {}", request.getTeacherId());
 
-        // Validate teacher has sufficient earnings
         BigDecimal availableEarnings = earningsService.getPendingAmount(request.getTeacherId());
 
         if (availableEarnings.compareTo(request.getAmount()) < 0) {
@@ -44,7 +48,14 @@ public class PayoutService {
                             ", Requested: " + request.getAmount());
         }
 
-        // Create payout entity
+        // ✅ NEW: fetch unpaid earnings
+        List<TeacherEarnings> earningsList =
+                teacherEarningsRepository.findByTeacherIdAndIsPaidOutFalse(request.getTeacherId());
+
+        List<String> earningIds = earningsList.stream()
+                .map(TeacherEarnings::getId)
+                .collect(Collectors.toList());
+
         Payout payout = Payout.builder()
                 .teacherId(request.getTeacherId())
                 .amount(request.getAmount())
@@ -57,6 +68,11 @@ public class PayoutService {
                 .periodEnd(request.getPeriodEnd())
                 .transactionId("TXN_" + UUID.randomUUID().toString())
                 .scheduledAt(LocalDateTime.now())
+
+                // ✅ NEW FIELDS
+                .earningIds(earningIds)
+                .totalTransactions(earningIds.size())
+
                 .build();
 
         payout = payoutRepository.save(payout);
@@ -81,20 +97,25 @@ public class PayoutService {
         payout = payoutRepository.save(payout);
 
         try {
-            // Process bank transfer
             String gatewayPayoutId = bankTransferService.transferToBank(payout);
 
             payout.setGatewayPayoutId(gatewayPayoutId);
             payout.setStatus(PayoutStatus.COMPLETED);
             payout.setProcessedAt(LocalDateTime.now());
 
-            // Update teacher earnings
+            // ✅ EXISTING
             earningsService.processPayout(payout);
 
-            // Create transaction record
-            transactionService.createPayoutTransaction(payout); // ✅ Now works correctly
+            // ✅ NEW: mark earnings as paid (SAFE)
+            if (payout.getEarningIds() != null) {
+                List<TeacherEarnings> earningsList =
+                        teacherEarningsRepository.findAllById(payout.getEarningIds());
 
-            // Publish payout completed event
+                earningsList.forEach(e -> e.setIsPaidOut(true));
+                teacherEarningsRepository.saveAll(earningsList);
+            }
+
+            transactionService.createPayoutTransaction(payout);
             eventPublisher.publishPayoutCompleted(payout);
 
             log.info("Payout processed successfully: {}", payoutId);

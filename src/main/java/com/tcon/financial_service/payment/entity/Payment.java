@@ -38,7 +38,8 @@ public class Payment {
 
     private String courseId;
 
-    private BigDecimal amount;
+    // ================= EXISTING =================
+    private BigDecimal amount;              // Total amount paid by user
     private String currency;
 
     private PaymentStatus status;
@@ -52,7 +53,8 @@ public class Payment {
     private String parentPaymentId;
 
     private BigDecimal commissionRate;
-    private BigDecimal commissionAmount;
+    private BigDecimal commissionAmount;   // (kept for backward compatibility)
+
     private BigDecimal teacherEarnings;
 
     private Boolean isInstallment;
@@ -72,4 +74,39 @@ public class Payment {
     private LocalDateTime updatedAt;
 
     private LocalDateTime completedAt;
+
+    // ================= NEW FIELDS (ADDED) =================
+
+    /**
+     * Payment Gateway Fee (Stripe/Razorpay deduction)
+     */
+    private BigDecimal gatewayFee;
+
+    /**
+     * Gateway fee percentage used for this transaction
+     */
+    private BigDecimal gatewayFeePercentage;
+
+    /**
+     * Net amount after gateway deduction
+     * netAmount = amount - gatewayFee
+     */
+    private BigDecimal netAmount;
+
+    /**
+     * Platform fee (same as commissionAmount but explicitly named for clarity)
+     */
+    private BigDecimal platformFee;
+
+    /**
+     * Platform fee percentage used
+     */
+    private BigDecimal platformFeePercentage;
+
+    // ================= NEGOTIATION FIELD =================
+
+    /**
+     * Indicates if platform fee was negotiated (admin approved)
+     */
+    private Boolean isNegotiated;
 }

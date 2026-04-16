@@ -7,7 +7,7 @@ import com.tcon.financial_service.payment.repository.PaymentRepository;
 import com.tcon.financial_service.payout.dto.EarningsDto;
 import com.tcon.financial_service.payout.entity.Payout;
 import com.tcon.financial_service.payout.entity.TeacherEarnings;
-import com.tcon.financial_service.payout.repository.TeacherEarningsRepository;
+import com.tcon.financial_service.payout.repository.TeacherPayoutRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class EarningsCalculationService {
 
-    private final TeacherEarningsRepository earningsRepository;
+    private final TeacherPayoutRepository earningsRepository;
     private final PaymentRepository paymentRepository;
 
     @Transactional

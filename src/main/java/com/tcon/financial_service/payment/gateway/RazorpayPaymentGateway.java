@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Slf4j
 @Service
@@ -28,6 +29,10 @@ public class RazorpayPaymentGateway implements PaymentGatewayInterface {
 
     @Value("${payment.razorpay.mock-mode:true}")
     private boolean mockMode;
+
+    // ✅ NEW: Gateway fee percentage
+    @Value("${payment.razorpay.fee-percentage:2.0}")
+    private BigDecimal feePercentage;
 
     @Override
     public PaymentResponse createPaymentIntent(PaymentRequest request) throws RazorpayException {
@@ -43,7 +48,7 @@ public class RazorpayPaymentGateway implements PaymentGatewayInterface {
                     .longValue();
 
             JSONObject orderRequest = new JSONObject();
-            orderRequest.put("amount", Long.valueOf(amountInPaise)); // ✅ Convert to Long
+            orderRequest.put("amount", Long.valueOf(amountInPaise));
             orderRequest.put("currency", request.getCurrency());
             orderRequest.put("receipt", "rcpt_" + request.getBookingId());
 
@@ -89,37 +94,46 @@ public class RazorpayPaymentGateway implements PaymentGatewayInterface {
         }
 
         try {
-            // Fetch payment details
             com.razorpay.Payment razorpayPayment = razorpayClient.payments.fetch(paymentId);
 
             String status = razorpayPayment.get("status").toString();
 
-            // Razorpay payments are auto-captured by default
-            // Manual capture is only needed if you've disabled auto-capture
             if ("authorized".equals(status)) {
                 log.info("Payment is authorized but not captured. Attempting capture...");
 
-                // Get amount as Integer
                 Integer amountInPaise = Integer.valueOf(razorpayPayment.get("amount").toString());
 
-                // Create capture request as JSONObject
                 JSONObject captureRequest = new JSONObject();
                 captureRequest.put("amount", amountInPaise);
                 captureRequest.put("currency", razorpayPayment.get("currency").toString());
 
-                // Use Razorpay client to capture with JSONObject
                 razorpayPayment = razorpayClient.payments.capture(paymentId, captureRequest);
 
                 log.info("Payment captured successfully: {}", paymentId);
             }
 
+            // ✅ Convert amount
+            BigDecimal amount = new BigDecimal(razorpayPayment.get("amount").toString())
+                    .divide(BigDecimal.valueOf(100));
+
+            // ✅ Calculate gateway fee
+            BigDecimal baseFee = amount.multiply(feePercentage)
+                    .divide(BigDecimal.valueOf(100));
+
+            BigDecimal gst = baseFee.multiply(BigDecimal.valueOf(18))
+                    .divide(BigDecimal.valueOf(100));
+
+            BigDecimal gatewayFee = baseFee.add(gst)
+                    .setScale(2, RoundingMode.HALF_UP);
+
             return PaymentResponse.builder()
                     .gatewayPaymentId(razorpayPayment.get("id").toString())
-                    .amount(new BigDecimal(razorpayPayment.get("amount").toString())
-                            .divide(BigDecimal.valueOf(100)))
+                    .amount(amount)
                     .currency(razorpayPayment.get("currency").toString())
                     .status(mapRazorpayStatus(razorpayPayment.get("status")))
                     .gateway(PaymentGateway.RAZORPAY)
+                    .gatewayFee(gatewayFee)
+                    .gatewayFeePercentage(feePercentage)
                     .build();
 
         } catch (RazorpayException e) {
@@ -140,10 +154,9 @@ public class RazorpayPaymentGateway implements PaymentGatewayInterface {
             long refundAmount = amount.multiply(BigDecimal.valueOf(100)).longValue();
 
             JSONObject refundRequest = new JSONObject();
-            refundRequest.put("amount", Long.valueOf(refundAmount)); // ✅ Convert to Long
-            refundRequest.put("speed", "normal"); // normal or optimum
+            refundRequest.put("amount", Long.valueOf(refundAmount));
+            refundRequest.put("speed", "normal");
 
-            // Create refund using Razorpay client
             com.razorpay.Refund refund = razorpayClient.payments.refund(paymentId, refundRequest);
 
             String refundId = refund.get("id").toString();
@@ -233,12 +246,25 @@ public class RazorpayPaymentGateway implements PaymentGatewayInterface {
     private PaymentResponse mockCapturePayment(String paymentId) {
         log.info("MOCK MODE: Capturing mock payment: {}", paymentId);
 
+        BigDecimal amount = BigDecimal.valueOf(1000.00);
+
+        BigDecimal baseFee = amount.multiply(feePercentage)
+                .divide(BigDecimal.valueOf(100));
+
+        BigDecimal gst = baseFee.multiply(BigDecimal.valueOf(18))
+                .divide(BigDecimal.valueOf(100));
+
+        BigDecimal gatewayFee = baseFee.add(gst)
+                .setScale(2, RoundingMode.HALF_UP);
+
         return PaymentResponse.builder()
                 .gatewayPaymentId(paymentId)
-                .amount(BigDecimal.valueOf(1000.00))
+                .amount(amount)
                 .currency("INR")
                 .status(PaymentStatus.COMPLETED)
                 .gateway(PaymentGateway.RAZORPAY)
+                .gatewayFee(gatewayFee)
+                .gatewayFeePercentage(feePercentage)
                 .build();
     }
 

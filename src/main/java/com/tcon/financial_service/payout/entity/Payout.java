@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -31,6 +32,20 @@ public class Payout {
     private String currency;
 
     private PayoutStatus status;
+
+    // ================= NEW FIELD (IMPORTANT) =================
+
+    /**
+     * List of earnings included in this payout
+     */
+    private List<String> earningIds;
+
+    /**
+     * Total number of earnings included
+     */
+    private Integer totalTransactions;
+
+    // ========================================================
 
     // Bank details
     private String bankAccountNumber;

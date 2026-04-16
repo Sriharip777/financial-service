@@ -36,6 +36,12 @@ public class PaymentDto {
     private BigDecimal commissionAmount;
     private BigDecimal teacherEarnings;
 
+    // ================= NEW FIELDS =================
+    private BigDecimal gatewayFee;
+    private BigDecimal netAmount;
+    private BigDecimal platformFee;
+    // =============================================
+
     private Boolean isInstallment;
     private Integer installmentNumber;
     private Integer totalInstallments;

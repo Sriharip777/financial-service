@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface TeacherEarningsRepository extends MongoRepository<TeacherEarnings, String> {
+public interface TeacherPayoutRepository extends MongoRepository<TeacherEarnings, String> {
 
     Optional<TeacherEarnings> findByTeacherId(String teacherId);
 }

@@ -30,6 +30,12 @@ public class StripePaymentGateway implements PaymentGatewayInterface {
 
     private final RequestOptions stripeRequestOptions;
 
+    @Value("${payment.stripe.fee-percentage:2.9}")
+    private BigDecimal feePercentage;
+
+    @Value("${payment.stripe.fixed-fee:0.30}")
+    private BigDecimal fixedFee;
+
     @Value("${payment.stripe.webhook-secret}")
     private String webhookSecret;
 
@@ -81,6 +87,17 @@ public class StripePaymentGateway implements PaymentGatewayInterface {
 
             log.info("Stripe Payment Intent created successfully: {}", paymentIntent.getId());
 
+            BigDecimal amount = BigDecimal.valueOf(paymentIntent.getAmount())
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+// ✅ Stripe fee calculation
+            BigDecimal percentageFee = amount.multiply(feePercentage)
+                    .divide(BigDecimal.valueOf(100));
+
+            BigDecimal gatewayFee = percentageFee
+                    .add(fixedFee)
+                    .setScale(2, RoundingMode.HALF_UP);
+
             // ✅ Use PaymentIntent ID as orderId instead of bookingId
             return PaymentResponse.builder()
                     .gatewayPaymentId(paymentIntent.getId())
@@ -111,29 +128,35 @@ public class StripePaymentGateway implements PaymentGatewayInterface {
         log.info("Capturing Stripe Payment: {}", paymentIntentId);
 
         try {
-            // Retrieve payment intent
             PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentIntentId, stripeRequestOptions);
 
-            // Check if payment needs to be captured
             if ("requires_capture".equals(paymentIntent.getStatus())) {
-                log.info("Payment requires capture. Capturing now: {}", paymentIntentId);
-
                 PaymentIntentCaptureParams params = PaymentIntentCaptureParams.builder().build();
                 paymentIntent = paymentIntent.capture(params, stripeRequestOptions);
-
-                log.info("Payment captured successfully: {}", paymentIntentId);
-            } else {
-                log.info("Payment status is: {}. No capture needed.", paymentIntent.getStatus());
             }
+
+            // ✅ Convert amount
+            BigDecimal amount = BigDecimal.valueOf(paymentIntent.getAmount())
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+            // ✅ Stripe fee calculation (2.9% + 0.30)
+            BigDecimal percentageFee = amount.multiply(feePercentage)
+                    .divide(BigDecimal.valueOf(100));
+
+            BigDecimal gatewayFee = percentageFee
+                    .add(fixedFee)
+                    .setScale(2, RoundingMode.HALF_UP);
 
             return PaymentResponse.builder()
                     .gatewayPaymentId(paymentIntent.getId())
-                    .amount(BigDecimal.valueOf(paymentIntent.getAmount())
-                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP))
+                    .amount(amount)
                     .currency(paymentIntent.getCurrency().toUpperCase())
                     .status(mapStripeStatus(paymentIntent.getStatus()))
                     .gateway(PaymentGateway.STRIPE)
+                    .gatewayFee(gatewayFee)                 // ✅ CORRECT PLACE
+                    .gatewayFeePercentage(feePercentage)
                     .build();
+
 
         } catch (StripeException e) {
             log.error("Payment capture failed for: {}", paymentIntentId, e);
@@ -208,6 +231,8 @@ public class StripePaymentGateway implements PaymentGatewayInterface {
             throw e;
         }
     }
+
+
 
     /**
      * Map Stripe payment status to internal PaymentStatus enum

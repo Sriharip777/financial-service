@@ -51,4 +51,9 @@ public class PaymentRequest {
     private PaymentFrequency paymentFrequency; // ✅ Added this field
 
     private Map<String, String> metadata;
+
+    /**
+     * Indicates if platform fee is negotiated (admin approved)
+     */
+    private Boolean isNegotiated;
 }

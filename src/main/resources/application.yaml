@@ -9,7 +9,6 @@ spring:
     compatibility-verifier:
       enabled: false  # ✅ Disable version check
 
-
   main:
     allow-bean-definition-overriding: false
 
@@ -50,13 +49,17 @@ eureka:
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
 
-# Payment Gateway Configuration
+# ================= PAYMENT GATEWAY CONFIG =================
 payment:
   stripe:
     api-key: ${STRIPE_SECRET_KEY:sk_test_51Su9Hd2KyroM3brJw7msQHMT3mumCNyd3GuE3kNNLCPAqlhcljl9ajqNmrDkT5teXYD3qktw8yvlVgap62C6Wojy00dnA53xUU}
     publishable-key: ${STRIPE_PUBLISHABLE_KEY:pk_test_51Su9Hd2KyroM3brJExw3PFmDK0X8pSZV9W9JpvnmTTpz0P1ndA3aMJVTKFLOx7tjOqUtY8p5jIIOq8WX9RG4qJ3K00hcGb6iVW}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_fxlCtJPwYVSVCMR3kbIGaevgFkspeyLY}
     api-version: "2023-10-16"
+
+    # ✅ Stripe Fees (REAL)
+    fee-percentage: 2.9
+    fixed-fee: 0.30
 
   razorpay:
     key-id: ${RAZORPAY_KEY_ID:rzp_test_S1ine1s34el7Yi}
@@ -65,12 +68,22 @@ payment:
     mock-mode: false
     account-number: "2323230041234967"
 
-# Commission Configuration
-commission:
-  one-time: 0.20  # 20% commission for one-time bookings
-  recurring: 0.10  # 10% commission for recurring courses
+    # ✅ Razorpay Fees (REAL)
+    fee-percentage: 2.0
+    gst-percentage: 18
 
-# Payout Configuration
+# ================= OLD COMMISSION (KEEP - BACKWARD COMPATIBILITY) =================
+commission:
+  one-time: 0.20
+  recurring: 0.10
+
+# ================= PLATFORM FEE (MAIN BUSINESS LOGIC) =================
+platform:
+  fee:
+    default-rate: 0.25      # 25%
+    negotiated-rate: 0.20   # 20% (admin-approved)
+
+# ================= PAYOUT CONFIG =================
 payout:
   mock-mode: true
   schedule:
@@ -79,12 +92,12 @@ payout:
     minute: 0
   minimum-amount: 1000
 
-# Refund Configuration
+# ================= REFUND CONFIG =================
 refund:
   cancellation-hours-threshold: 24
   processing-fee-percentage: 0.02
 
-# Management & Monitoring
+# ================= MANAGEMENT =================
 management:
   endpoints:
     web:
@@ -98,8 +111,7 @@ management:
     tags:
       application: ${spring.application.name}
 
-# Logging Configuration
-
+# ================= LOGGING =================
 logging:
   level:
     root: INFO
@@ -113,9 +125,3 @@ logging:
     org.springframework.data.redis: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-    # ✅ DISABLED: No file logging = No git conflicts!
-  # file:  # <-- COMMENTED OUT
-  #   name: logs/api-gateway.log
-  #   max-size: 10MB
-  #   max-history: 30
-

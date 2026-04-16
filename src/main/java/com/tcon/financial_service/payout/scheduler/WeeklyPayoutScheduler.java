@@ -1,7 +1,7 @@
 package com.tcon.financial_service.payout.scheduler;
 
 import com.tcon.financial_service.payout.dto.PayoutRequest;
-import com.tcon.financial_service.payout.repository.TeacherEarningsRepository;
+import com.tcon.financial_service.payout.repository.TeacherPayoutRepository;
 import com.tcon.financial_service.payout.service.EarningsCalculationService;
 import com.tcon.financial_service.payout.service.PayoutService;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ public class WeeklyPayoutScheduler {
 
     private final PayoutService payoutService;
     private final EarningsCalculationService earningsService;
-    private final TeacherEarningsRepository earningsRepository;
+    private final TeacherPayoutRepository earningsRepository;
 
     @Value("${payout.schedule.day-of-week}")
     private DayOfWeek payoutDay;

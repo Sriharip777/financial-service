@@ -11,57 +11,73 @@ import java.math.RoundingMode;
 @Service
 public class CommissionCalculationService {
 
-    @Value("${commission.one-time:0.20}")  // ✅ Changed from non-recurring
+    // ================= OLD (KEEP) =================
+    @Value("${commission.one-time:0.20}")
     private BigDecimal oneTimeRate;
 
     @Value("${commission.recurring:0.10}")
     private BigDecimal recurringRate;
 
+    // ================= NEW (PLATFORM FEE) =================
+    @Value("${platform.fee.default-rate:0.25}")
+    private BigDecimal defaultPlatformRate;
+
+    @Value("${platform.fee.negotiated-rate:0.20}")
+    private BigDecimal negotiatedPlatformRate;
+
     /**
-     * Get commission rate based on booking type
+     * OLD: Commission (kept for backward compatibility)
      */
     public BigDecimal getCommissionRate(boolean isRecurring) {
         return isRecurring ? recurringRate : oneTimeRate;
     }
 
-    /**
-     * Calculate commission amount
-     */
     public BigDecimal calculateCommission(BigDecimal amount, boolean isRecurring) {
         BigDecimal rate = getCommissionRate(isRecurring);
-        BigDecimal commission = amount.multiply(rate)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        log.debug("Commission calculated: Amount={}, Rate={}, Commission={}",
-                amount, rate, commission);
-
-        return commission;
+        return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
-     * Calculate teacher earnings (amount after commission)
+     * ================= NEW LOGIC =================
      */
-    public BigDecimal calculateTeacherEarnings(BigDecimal amount, boolean isRecurring) {
-        BigDecimal commission = calculateCommission(amount, isRecurring);
-        BigDecimal earnings = amount.subtract(commission)
+
+    public BigDecimal getPlatformFeeRate(Boolean isNegotiated) {
+        return Boolean.TRUE.equals(isNegotiated)
+                ? negotiatedPlatformRate   // 20%
+                : defaultPlatformRate;     // 25%
+    }
+
+    public BigDecimal calculatePlatformFee(BigDecimal amount, Boolean isNegotiated) {
+        BigDecimal rate = getPlatformFeeRate(isNegotiated);
+
+        BigDecimal fee = amount.multiply(rate)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        log.debug("Teacher earnings calculated: Amount={}, Commission={}, Earnings={}",
-                amount, commission, earnings);
+        log.debug("Platform fee calculated: Amount={}, Rate={}, Fee={}",
+                amount, rate, fee);
+
+        return fee;
+    }
+
+    public BigDecimal calculateTeacherEarnings(BigDecimal amount, Boolean isNegotiated) {
+        BigDecimal platformFee = calculatePlatformFee(amount, isNegotiated);
+
+        BigDecimal earnings = amount.subtract(platformFee)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        log.debug("Teacher earnings calculated: Amount={}, PlatformFee={}, Earnings={}",
+                amount, platformFee, earnings);
 
         return earnings;
     }
 
     /**
-     * Get one-time commission rate
+     * Getters
      */
     public BigDecimal getOneTimeRate() {
         return oneTimeRate;
     }
 
-    /**
-     * Get recurring commission rate
-     */
     public BigDecimal getRecurringRate() {
         return recurringRate;
     }
