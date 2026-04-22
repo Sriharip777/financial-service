@@ -3,7 +3,6 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 server:
-  # ✅ FIX: default 8080 not 8085 — Cloud Run always injects PORT=8080
   port: ${PORT:8080}
   shutdown: graceful
   forward-headers-strategy: framework
@@ -78,9 +77,7 @@ eureka:
     eureka-server-read-timeout-seconds: 10
     healthcheck:
       enabled: false
-
   instance:
-    # ✅ Plain hostname only — no https://, no /eureka/ suffix
     hostname: ${EUREKA_INSTANCE_HOSTNAME}
     prefer-ip-address: false
     instance-id: ${spring.application.name}:${eureka.instance.hostname}
@@ -94,13 +91,36 @@ eureka:
     lease-expiration-duration-in-seconds: 90
     initial-status: UP
 
+# ══════════════════════════════════════════════════════════════════════════════
+# FEIGN CLIENT SERVICE URLs
+# ══════════════════════════════════════════════════════════════════════════════
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 10000
+        readTimeout: 30000
+        loggerLevel: BASIC
+
+auth-service:
+  url: ${AUTH_SERVICE_URL}
+
+course-service:
+  url: ${COURSE_SERVICE_URL}
+
+communication-service:
+  url: ${COMMUNICATION_SERVICE_URL}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAYMENT GATEWAYS
+# ══════════════════════════════════════════════════════════════════════════════
 payment:
   stripe:
     api-key: ${STRIPE_SECRET_KEY}
     publishable-key: ${STRIPE_PUBLISHABLE_KEY}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET}
     api-version: ${STRIPE_API_VERSION:2023-10-16}
-
   razorpay:
     key-id: ${RAZORPAY_KEY_ID}
     key-secret: ${RAZORPAY_KEY_SECRET}
@@ -113,7 +133,6 @@ commission:
   recurring: ${COMMISSION_RECURRING:0.10}
 
 payout:
-  # ✅ FIX: default true so app starts even if PAYOUT_MOCK_MODE not set
   mock-mode: ${PAYOUT_MOCK_MODE:true}
   schedule:
     day-of-week: ${PAYOUT_DAY_OF_WEEK:MONDAY}
@@ -125,6 +144,9 @@ refund:
   cancellation-hours-threshold: ${REFUND_CANCELLATION_HOURS_THRESHOLD:24}
   processing-fee-percentage: ${REFUND_PROCESSING_FEE_PERCENTAGE:0.02}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# MANAGEMENT & MONITORING
+# ══════════════════════════════════════════════════════════════════════════════
 management:
   endpoints:
     web:
@@ -142,6 +164,9 @@ management:
     tags:
       application: ${spring.application.name}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGGING
+# ══════════════════════════════════════════════════════════════════════════════
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
