@@ -167,82 +167,6 @@ public class PaymentService {
 
         Payment payment = findPaymentByAnyId(paymentId);
 
-        // ================= NEW GATEWAY FEE LOGIC =================
-
-        PaymentGatewayInterface gateway = gatewayFactory.getGateway(payment.getGateway());
-
-        PaymentResponse gatewayResponse;
-        try {
-            gatewayResponse = gateway.capturePayment(payment.getGatewayPaymentId());
-        } catch (Exception e) {
-            log.error("❌ Error while capturing payment from gateway", e);
-            throw new RuntimeException("Payment capture failed: " + e.getMessage(), e);
-        }
-
-// Amount from gateway
-        BigDecimal amount = gatewayResponse.getAmount();
-
-// Gateway fee
-        BigDecimal gatewayFee = gatewayResponse.getGatewayFee() != null
-                ? gatewayResponse.getGatewayFee()
-                : BigDecimal.ZERO;
-
-// Net amount
-        BigDecimal netAmount = amount.subtract(gatewayFee);
-
-// Determine commission type
-        boolean isRecurring = payment.getCourseId() != null &&
-                Boolean.TRUE.equals(payment.getIsInstallment());
-
-// Platform fee calculation
-        BigDecimal commissionRate = commissionService.getCommissionRate(isRecurring);
-        BigDecimal platformFee = commissionService.calculateCommission(netAmount, isRecurring);
-
-// Teacher earnings
-        BigDecimal teacherEarnings = netAmount.subtract(platformFee);
-
-        // ================= NEGOTIATION LOGIC (ADDED ONLY) =================
-
-// Override using negotiation (if applicable)
-        Boolean isNegotiated = payment.getIsNegotiated();
-
-        BigDecimal newPlatformRate = commissionService.getPlatformFeeRate(isNegotiated);
-
-        BigDecimal newPlatformFee = commissionService.calculatePlatformFee(
-                netAmount,
-                isNegotiated
-        );
-
-        BigDecimal newTeacherEarnings = commissionService.calculateTeacherEarnings(
-                netAmount,
-                isNegotiated
-        );
-
-// Override values safely (no removal of old logic)
-        commissionRate = newPlatformRate;
-        platformFee = newPlatformFee;
-        teacherEarnings = newTeacherEarnings;
-
-// ================= END =================
-
-// Set NEW fields (no removal of old ones)
-        payment.setGatewayFee(gatewayFee);
-        payment.setGatewayFeePercentage(gatewayResponse.getGatewayFeePercentage());
-        payment.setNetAmount(netAmount);
-
-        payment.setPlatformFee(platformFee);
-        payment.setPlatformFeePercentage(commissionRate);
-
-// Override safely (backward compatibility)
-        payment.setCommissionRate(commissionRate);
-        payment.setCommissionAmount(platformFee);
-        payment.setTeacherEarnings(teacherEarnings);
-
-// Optional: update amount from gateway
-        payment.setAmount(amount);
-
-// ================= END NEW LOGIC =================
-
         if (payment.getStatus() == PaymentStatus.COMPLETED) {
             log.warn("Payment already completed: {}", paymentId);
             return mapToDto(payment);
@@ -252,19 +176,88 @@ public class PaymentService {
             throw new IllegalStateException("Cannot confirm payment with status: " + payment.getStatus());
         }
 
+        BigDecimal amount;
+        BigDecimal gatewayFee = BigDecimal.ZERO;
+        BigDecimal netAmount;
+
+        // ========= GATEWAY-SPECIFIC HANDLING =========
+        if (payment.getGateway() == com.tcon.financial_service.payment.entity.PaymentGateway.RAZORPAY) {
+            // Razorpay: we only have order_..., do NOT call payments.fetch/capture with this.
+            log.info("Razorpay payment confirmation without server-side capture. paymentId={}, gatewayPaymentId={}",
+                    payment.getId(), payment.getGatewayPaymentId());
+
+            amount = payment.getAmount();
+            netAmount = amount;
+        } else {
+            PaymentGatewayInterface gateway = gatewayFactory.getGateway(payment.getGateway());
+
+            PaymentResponse gatewayResponse;
+            try {
+                gatewayResponse = gateway.capturePayment(payment.getGatewayPaymentId());
+            } catch (Exception e) {
+                log.error("❌ Error while capturing payment from gateway", e);
+                throw new RuntimeException("Payment capture failed: " + e.getMessage(), e);
+            }
+
+            amount = gatewayResponse.getAmount();
+
+            gatewayFee = gatewayResponse.getGatewayFee() != null
+                    ? gatewayResponse.getGatewayFee()
+                    : BigDecimal.ZERO;
+
+            netAmount = amount.subtract(gatewayFee);
+
+            payment.setGatewayFee(gatewayFee);
+            payment.setGatewayFeePercentage(gatewayResponse.getGatewayFeePercentage());
+            payment.setNetAmount(netAmount);
+        }
+        // ========= END GATEWAY-SPECIFIC HANDLING =========
+
+        boolean isRecurring = payment.getCourseId() != null &&
+                Boolean.TRUE.equals(payment.getIsInstallment());
+
+        BigDecimal commissionRate = commissionService.getCommissionRate(isRecurring);
+        BigDecimal platformFee = commissionService.calculateCommission(netAmount, isRecurring);
+        BigDecimal teacherEarnings = netAmount.subtract(platformFee);
+
+        Boolean isNegotiated = payment.getIsNegotiated();
+
+        BigDecimal newPlatformRate = commissionService.getPlatformFeeRate(isNegotiated);
+        BigDecimal newPlatformFee = commissionService.calculatePlatformFee(
+                netAmount,
+                isNegotiated
+        );
+        BigDecimal newTeacherEarnings = commissionService.calculateTeacherEarnings(
+                netAmount,
+                isNegotiated
+        );
+
+        commissionRate = newPlatformRate;
+        platformFee = newPlatformFee;
+        teacherEarnings = newTeacherEarnings;
+
+        payment.setPlatformFee(platformFee);
+        payment.setPlatformFeePercentage(commissionRate);
+
+        payment.setCommissionRate(commissionRate);
+        payment.setCommissionAmount(platformFee);
+        payment.setTeacherEarnings(teacherEarnings);
+
+        payment.setAmount(amount);
+        if (payment.getNetAmount() == null) {
+            payment.setNetAmount(netAmount);
+        }
+
         payment.setStatus(PaymentStatus.COMPLETED);
         payment.setCompletedAt(LocalDateTime.now());
         payment = paymentRepository.save(payment);
 
-        // ✅ Create transaction
         transactionService.createPaymentTransaction(payment);
 
-        // ✅ Handle installments if needed
         if (Boolean.TRUE.equals(payment.getIsInstallment())) {
             installmentService.updateInstallmentProgress(payment);
         }
 
-        // ✅✅✅ PUBLISH KAFKA EVENT - ADD TRY-CATCH FOR DEBUGGING
         try {
             log.info("📤 About to publish Kafka event for payment: {}", payment.getId());
             eventPublisher.publishPaymentCompleted(payment);
@@ -276,7 +269,6 @@ public class PaymentService {
         log.info("Payment confirmed successfully: {}", paymentId);
         return mapToDto(payment);
     }
-
 
     // ✅ Add this new method
     private Payment findPaymentByAnyId(String identifier) {
