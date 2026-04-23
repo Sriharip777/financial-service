@@ -1,6 +1,6 @@
-# ══════════════════════════════════════════════════════════════════════════════
+# =====================================================================
 # FINANCIAL-SERVICE — PRODUCTION
-# ══════════════════════════════════════════════════════════════════════════════
+# =====================================================================
 
 server:
   port: ${PORT:8080}
@@ -72,11 +72,12 @@ eureka:
     fetch-registry: true
     service-url:
       defaultZone: ${EUREKA_URL}
-    registry-fetch-interval-seconds: 15
-    eureka-server-connect-timeout-seconds: 10
-    eureka-server-read-timeout-seconds: 10
+    registry-fetch-interval-seconds: 30
+    eureka-server-connect-timeout-seconds: 15
+    eureka-server-read-timeout-seconds: 15
     healthcheck:
       enabled: false
+
   instance:
     hostname: ${EUREKA_INSTANCE_HOSTNAME}
     prefer-ip-address: false
@@ -87,13 +88,10 @@ eureka:
     home-page-url: https://${eureka.instance.hostname}/
     status-page-url: https://${eureka.instance.hostname}/actuator/info
     health-check-url: https://${eureka.instance.hostname}/actuator/health
-    lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 90
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 180
     initial-status: UP
 
-# ══════════════════════════════════════════════════════════════════════════════
-# FEIGN CLIENT SERVICE URLs
-# ══════════════════════════════════════════════════════════════════════════════
 feign:
   client:
     config:
@@ -111,10 +109,6 @@ course-service:
 communication-service:
   url: ${COMMUNICATION_SERVICE_URL}
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAYMENT GATEWAYS
-# ══════════════════════════════════════════════════════════════════════════════
 payment:
   stripe:
     api-key: ${STRIPE_SECRET_KEY}
@@ -144,9 +138,6 @@ refund:
   cancellation-hours-threshold: ${REFUND_CANCELLATION_HOURS_THRESHOLD:24}
   processing-fee-percentage: ${REFUND_PROCESSING_FEE_PERCENTAGE:0.02}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MANAGEMENT & MONITORING
-# ══════════════════════════════════════════════════════════════════════════════
 management:
   endpoints:
     web:
@@ -164,9 +155,6 @@ management:
     tags:
       application: ${spring.application.name}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# LOGGING
-# ══════════════════════════════════════════════════════════════════════════════
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
