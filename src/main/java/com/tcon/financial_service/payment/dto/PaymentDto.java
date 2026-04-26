@@ -22,7 +22,6 @@ public class PaymentDto {
     private String bookingId;
     private String studentId;
     private String teacherId;
-    private String courseId;
 
     private BigDecimal amount;
     private String currency;
@@ -32,31 +31,24 @@ public class PaymentDto {
     private PaymentGateway gateway;
 
     private String gatewayPaymentId;
-    private String parentPaymentId;
 
     private BigDecimal commissionRate;
     private BigDecimal commissionAmount;
     private BigDecimal teacherEarnings;
 
-    // ===== Additional fee fields =====
+    // ================= NEW FIELDS =================
     private BigDecimal gatewayFee;
-    private BigDecimal gatewayFeePercentage;
     private BigDecimal netAmount;
     private BigDecimal platformFee;
-    private BigDecimal platformFeePercentage;
+    // =============================================
 
-    // ===== Installment fields =====
     private Boolean isInstallment;
     private Integer installmentNumber;
     private Integer totalInstallments;
 
-    // ===== Other details =====
     private String description;
-    private String receiptEmail;
     private String failureReason;
-    private Boolean isNegotiated;
 
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
 }
