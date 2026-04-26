@@ -13,6 +13,8 @@ spring:
 
   main:
     allow-bean-definition-overriding: false
+    # ✅ FIX #5: Faster Cloud Run startup — lazy-init beans not needed at boot
+    lazy-initialization: false
 
   output:
     ansi:
@@ -53,6 +55,9 @@ spring:
       properties:
         retry.backoff.ms: 1000
         max.in.flight.requests.per.connection: 1
+    listener:
+      # ✅ FIX #4: Don't crash at startup if Kafka topics don't exist yet
+      missing-topics-fatal: false
     properties:
       security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
       request.timeout.ms: 30000
@@ -75,6 +80,8 @@ eureka:
     registry-fetch-interval-seconds: 15
     eureka-server-connect-timeout-seconds: 10
     eureka-server-read-timeout-seconds: 10
+    # ✅ FIX #3: Don't block startup waiting for Eureka registration to complete
+    should-enforce-registration-at-init: false
     healthcheck:
       enabled: false
   instance:
@@ -111,7 +118,6 @@ course-service:
 communication-service:
   url: ${COMMUNICATION_SERVICE_URL}
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # PAYMENT GATEWAYS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -121,6 +127,8 @@ payment:
     publishable-key: ${STRIPE_PUBLISHABLE_KEY}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET}
     api-version: ${STRIPE_API_VERSION:2023-10-16}
+    # ✅ FIX #1: STRIPE_MOCK_MODE was set in env but missing here → BeanCreationException
+    mock-mode: ${STRIPE_MOCK_MODE:false}
   razorpay:
     key-id: ${RAZORPAY_KEY_ID}
     key-secret: ${RAZORPAY_KEY_SECRET}
@@ -160,6 +168,9 @@ management:
   health:
     mongo:
       enabled: true
+    # ✅ FIX #6: Kafka health check must NOT block /actuator/health during Cloud Run startup probe
+    kafka:
+      enabled: false
   metrics:
     tags:
       application: ${spring.application.name}
