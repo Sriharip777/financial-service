@@ -6,7 +6,6 @@ server:
   port: ${PORT:8080}
   shutdown: graceful
   forward-headers-strategy: framework
-  address: 0.0.0.0   # ✅ FIX: Cloud Run requires binding to 0.0.0.0
 
 spring:
   application:
@@ -14,7 +13,6 @@ spring:
 
   main:
     allow-bean-definition-overriding: false
-    lazy-initialization: true   # ✅ FIX: Bind port first, init beans after
 
   output:
     ansi:
@@ -55,17 +53,12 @@ spring:
       properties:
         retry.backoff.ms: 1000
         max.in.flight.requests.per.connection: 1
-        max.block.ms: 5000   # ✅ FIX: Stop Kafka blocking startup for 60s
-    listener:
-      missing-topics-fatal: false
-      auto-startup: false    # ✅ FIX: Don't start Kafka listeners at startup
     properties:
       security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
-      request.timeout.ms: 10000
+      request.timeout.ms: 30000
       connections.max.idle.ms: 540000
       reconnect.backoff.ms: 1000
       reconnect.backoff.max.ms: 10000
-      metadata.max.age.ms: 5000   # ✅ FIX: Fast fail on unreachable broker
 
   jackson:
     serialization:
@@ -79,11 +72,9 @@ eureka:
     fetch-registry: true
     service-url:
       defaultZone: ${EUREKA_URL}
-    registry-fetch-interval-seconds: 30
-    eureka-server-connect-timeout-seconds: 5
-    eureka-server-read-timeout-seconds: 5
-    should-enforce-registration-at-init: false   # ✅ FIX: Non-blocking Eureka
-    initial-instance-info-replication-interval-seconds: 5
+    registry-fetch-interval-seconds: 15
+    eureka-server-connect-timeout-seconds: 10
+    eureka-server-read-timeout-seconds: 10
     healthcheck:
       enabled: false
   instance:
@@ -100,6 +91,9 @@ eureka:
     lease-expiration-duration-in-seconds: 90
     initial-status: UP
 
+# ══════════════════════════════════════════════════════════════════════════════
+# FEIGN CLIENT SERVICE URLs
+# ══════════════════════════════════════════════════════════════════════════════
 feign:
   client:
     config:
@@ -117,13 +111,16 @@ course-service:
 communication-service:
   url: ${COMMUNICATION_SERVICE_URL}
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAYMENT GATEWAYS
+# ══════════════════════════════════════════════════════════════════════════════
 payment:
   stripe:
     api-key: ${STRIPE_SECRET_KEY}
     publishable-key: ${STRIPE_PUBLISHABLE_KEY}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET}
     api-version: ${STRIPE_API_VERSION:2023-10-16}
-    mock-mode: ${STRIPE_MOCK_MODE:false}
   razorpay:
     key-id: ${RAZORPAY_KEY_ID}
     key-secret: ${RAZORPAY_KEY_SECRET}
@@ -147,6 +144,9 @@ refund:
   cancellation-hours-threshold: ${REFUND_CANCELLATION_HOURS_THRESHOLD:24}
   processing-fee-percentage: ${REFUND_PROCESSING_FEE_PERCENTAGE:0.02}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# MANAGEMENT & MONITORING
+# ══════════════════════════════════════════════════════════════════════════════
 management:
   endpoints:
     web:
@@ -157,23 +157,22 @@ management:
     health:
       show-details: always
       show-components: always
-      probes:
-        enabled: true   # ✅ FIX: Enable /liveness and /readiness for Cloud Run
   health:
     mongo:
       enabled: true
-    kafka:
-      enabled: false   # ✅ FIX: Kafka must not block /actuator/health response
   metrics:
     tags:
       application: ${spring.application.name}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGGING
+# ══════════════════════════════════════════════════════════════════════════════
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
     com.tcon.financialservice: ${LOG_LEVEL_APP:INFO}
     org.springframework.cloud.loadbalancer: WARN
-    org.springframework.kafka: WARN
+    org.springframework.kafka: INFO
     org.apache.kafka: WARN
     com.netflix.discovery: WARN
     reactor.netty: WARN
