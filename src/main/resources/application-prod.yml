@@ -71,29 +71,29 @@ eureka:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: ${EUREKA_URL:https://educonservicediscovery-64307221061.asia-south1.run.app/eureka/}
-    registry-fetch-interval-seconds: 30
-    eureka-server-connect-timeout-seconds: 15
-    eureka-server-read-timeout-seconds: 20
-    initial-instance-info-replication-interval-seconds: 10
-    instance-info-replication-interval-seconds: 30
+      defaultZone: ${EUREKA_URL}
+    registry-fetch-interval-seconds: 15
+    eureka-server-connect-timeout-seconds: 10
+    eureka-server-read-timeout-seconds: 10
     healthcheck:
       enabled: false
-
   instance:
-    hostname: ${EUREKA_INSTANCE_HOSTNAME:financial-service-64307221061.asia-south1.run.app}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME}
     prefer-ip-address: false
-    instance-id: ${spring.application.name}:${EUREKA_INSTANCE_HOSTNAME:financial-service-64307221061.asia-south1.run.app}
+    instance-id: ${spring.application.name}:${eureka.instance.hostname}
     non-secure-port-enabled: false
     secure-port-enabled: true
     secure-port: 443
     home-page-url: https://${eureka.instance.hostname}/
     status-page-url: https://${eureka.instance.hostname}/actuator/info
     health-check-url: https://${eureka.instance.hostname}/actuator/health
-    lease-renewal-interval-in-seconds: 15
+    lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 90
-    initial-status: STARTING
+    initial-status: UP
 
+# ══════════════════════════════════════════════════════════════════════════════
+# FEIGN CLIENT SERVICE URLs
+# ══════════════════════════════════════════════════════════════════════════════
 feign:
   client:
     config:
@@ -111,6 +111,10 @@ course-service:
 communication-service:
   url: ${COMMUNICATION_SERVICE_URL}
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAYMENT GATEWAYS
+# ══════════════════════════════════════════════════════════════════════════════
 payment:
   stripe:
     api-key: ${STRIPE_SECRET_KEY}
@@ -140,6 +144,9 @@ refund:
   cancellation-hours-threshold: ${REFUND_CANCELLATION_HOURS_THRESHOLD:24}
   processing-fee-percentage: ${REFUND_PROCESSING_FEE_PERCENTAGE:0.02}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# MANAGEMENT & MONITORING
+# ══════════════════════════════════════════════════════════════════════════════
 management:
   endpoints:
     web:
@@ -157,6 +164,9 @@ management:
     tags:
       application: ${spring.application.name}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGGING
+# ══════════════════════════════════════════════════════════════════════════════
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
@@ -164,8 +174,7 @@ logging:
     org.springframework.cloud.loadbalancer: WARN
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
-    com.netflix.discovery: INFO
-    com.netflix.eureka: INFO
+    com.netflix.discovery: WARN
     reactor.netty: WARN
     io.netty: ERROR
     org.springframework.data.mongodb.core.MongoTemplate: WARN
