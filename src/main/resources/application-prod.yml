@@ -76,40 +76,34 @@ eureka:
     service-url:
       defaultZone: ${EUREKA_URL:https://educonservicediscovery-64307221061.asia-south1.run.app/eureka/}
 
-    # Increased from 15 → 30: Cloud Run cold starts take 5–15s,
-    # a tight interval floods logs with TransportException noise
+    # ✅ Relaxed intervals — Cloud Run cold starts take 5-20s
     registry-fetch-interval-seconds: 30
+    eureka-server-connect-timeout-seconds: 30
+    eureka-server-read-timeout-seconds: 30
 
-    # Increased from 10 → 15: gives Eureka server time to respond after cold start
-    eureka-server-connect-timeout-seconds: 15
-
-    # Increased from 10 → 20: prevents premature timeout while server warms up
-    eureka-server-read-timeout-seconds: 20
-
-    # Prevents Eureka client from giving up after a single server failure
+    # ✅ Prevents giving up after single server failure
     eureka-server-total-connections: 200
     eureka-server-total-connections-per-host: 50
 
-    # Prevents duplicate heartbeat threads accumulating on reconnect
+    # ✅ Thread pool settings
     heartbeat-executor-thread-pool-size: 2
+    heartbeat-executor-exponential-back-off-bound: 10
     cache-refresh-executor-thread-pool-size: 2
+    cache-refresh-executor-exponential-back-off-bound: 10
 
-    # Initial registration delay — gives the app time to fully start
-    initial-instance-info-replication-interval-seconds: 10
+    # ✅ Delay initial registration — let app fully start first
+    initial-instance-info-replication-interval-seconds: 20
     instance-info-replication-interval-seconds: 30
 
-    # Keep false — health check is done via health-check-url below, not push
     healthcheck:
       enabled: false
 
   instance:
-    # Must be set to Cloud Run service host e.g.
-    # financial-service-64307221061.asia-south1.run.app
+    # ✅ FIXED: must match your actual Cloud Run service hostname
     hostname: ${EUREKA_INSTANCE_HOSTNAME}
     prefer-ip-address: false
 
-    # FIXED: was ${spring.application.name}:${eureka.instance.hostname}
-    # Using property reference directly avoids circular resolution issues
+    # ✅ FIXED: clean instance-id format
     instance-id: ${spring.application.name}:${EUREKA_INSTANCE_HOSTNAME}
 
     non-secure-port-enabled: false
@@ -120,15 +114,11 @@ eureka:
     status-page-url: https://${eureka.instance.hostname}/actuator/info
     health-check-url: https://${eureka.instance.hostname}/actuator/health
 
-    # Increased from 10 → 15: reduces heartbeat noise on Cloud Run
-    lease-renewal-interval-in-seconds: 15
-
-    # Keep 90: gives enough grace time for Cloud Run cold starts
+    # ✅ Increased heartbeat interval — reduces noise on Cloud Run
+    lease-renewal-interval-in-seconds: 30
     lease-expiration-duration-in-seconds: 90
 
-    # FIXED: changed from UP → STARTING
-    # UP causes Eureka to route traffic before the app is ready
-    # Spring Boot auto-transitions to UP after ApplicationReadyEvent
+    # ✅ STARTING — prevents traffic before app is ready
     initial-status: STARTING
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -190,8 +180,7 @@ management:
   endpoints:
     web:
       exposure:
-        # Removed prometheus — add back only if you have a Prometheus scraper configured
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
       base-path: /actuator
   endpoint:
     health:
@@ -214,10 +203,8 @@ logging:
     org.springframework.cloud.loadbalancer: WARN
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
-    # FIXED: changed from WARN → INFO so you can see registration/heartbeat events
-    # Set back to WARN once registration is confirmed stable
-    com.netflix.discovery: INFO
-    com.netflix.eureka: INFO
+    com.netflix.discovery: WARN
+    com.netflix.eureka: WARN
     reactor.netty: WARN
     io.netty: ERROR
     org.springframework.data.mongodb.core.MongoTemplate: WARN
