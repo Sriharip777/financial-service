@@ -65,9 +65,6 @@ spring:
       write-dates-as-timestamps: false
     time-zone: UTC
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EUREKA — CLOUD RUN OPTIMIZED
-# ══════════════════════════════════════════════════════════════════════════════
 eureka:
   client:
     enabled: ${EUREKA_ENABLED:true}
@@ -96,9 +93,7 @@ eureka:
     lease-renewal-interval-in-seconds: 15
     lease-expiration-duration-in-seconds: 90
     initial-status: STARTING
-# ══════════════════════════════════════════════════════════════════════════════
-# FEIGN CLIENT SERVICE URLs
-# ══════════════════════════════════════════════════════════════════════════════
+
 feign:
   client:
     config:
@@ -116,9 +111,6 @@ course-service:
 communication-service:
   url: ${COMMUNICATION_SERVICE_URL}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAYMENT GATEWAYS
-# ══════════════════════════════════════════════════════════════════════════════
 payment:
   stripe:
     api-key: ${STRIPE_SECRET_KEY}
@@ -148,9 +140,6 @@ refund:
   cancellation-hours-threshold: ${REFUND_CANCELLATION_HOURS_THRESHOLD:24}
   processing-fee-percentage: ${REFUND_PROCESSING_FEE_PERCENTAGE:0.02}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MANAGEMENT & MONITORING
-# ══════════════════════════════════════════════════════════════════════════════
 management:
   endpoints:
     web:
@@ -168,9 +157,6 @@ management:
     tags:
       application: ${spring.application.name}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# LOGGING
-# ══════════════════════════════════════════════════════════════════════════════
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
@@ -178,8 +164,8 @@ logging:
     org.springframework.cloud.loadbalancer: WARN
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
-    com.netflix.discovery: WARN
-    com.netflix.eureka: WARN
+    com.netflix.discovery: INFO
+    com.netflix.eureka: INFO
     reactor.netty: WARN
     io.netty: ERROR
     org.springframework.data.mongodb.core.MongoTemplate: WARN
