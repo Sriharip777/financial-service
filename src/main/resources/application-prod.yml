@@ -78,7 +78,7 @@ eureka:
     healthcheck:
       enabled: true
   instance:
-    hostname: ${EUREKA_INSTANCE_HOSTNAME}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:financial-service-64307221061.asia-south1.run.app}
     prefer-ip-address: false
     instance-id: ${spring.application.name}:${eureka.instance.hostname}
     non-secure-port-enabled: false
@@ -152,7 +152,6 @@ management:
       enabled: true
     kafka:
       enabled: false
-
   metrics:
     tags:
       application: ${spring.application.name}
