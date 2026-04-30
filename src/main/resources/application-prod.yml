@@ -96,7 +96,6 @@ eureka:
     lease-renewal-interval-in-seconds: 15
     lease-expiration-duration-in-seconds: 90
     initial-status: STARTING
-
 # ══════════════════════════════════════════════════════════════════════════════
 # FEIGN CLIENT SERVICE URLs
 # ══════════════════════════════════════════════════════════════════════════════
