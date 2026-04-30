@@ -66,7 +66,7 @@ spring:
     time-zone: UTC
 
 # ══════════════════════════════════════════════════════════════════════════════
-# EUREKA — FIXED FOR CLOUD RUN
+# EUREKA — CLOUD RUN OPTIMIZED
 # ══════════════════════════════════════════════════════════════════════════════
 eureka:
   client:
@@ -75,50 +75,32 @@ eureka:
     fetch-registry: true
     service-url:
       defaultZone: ${EUREKA_URL:https://educonservicediscovery-64307221061.asia-south1.run.app/eureka/}
-
-    # ✅ Relaxed intervals — Cloud Run cold starts take 5-20s
     registry-fetch-interval-seconds: 30
     eureka-server-connect-timeout-seconds: 30
     eureka-server-read-timeout-seconds: 30
-
-    # ✅ Prevents giving up after single server failure
     eureka-server-total-connections: 200
     eureka-server-total-connections-per-host: 50
-
-    # ✅ Thread pool settings
     heartbeat-executor-thread-pool-size: 2
     heartbeat-executor-exponential-back-off-bound: 10
     cache-refresh-executor-thread-pool-size: 2
     cache-refresh-executor-exponential-back-off-bound: 10
-
-    # ✅ Delay initial registration — let app fully start first
     initial-instance-info-replication-interval-seconds: 20
     instance-info-replication-interval-seconds: 30
-
     healthcheck:
       enabled: false
 
   instance:
-    # ✅ FIXED: must match your actual Cloud Run service hostname
     hostname: ${EUREKA_INSTANCE_HOSTNAME}
     prefer-ip-address: false
-
-    # ✅ FIXED: clean instance-id format
     instance-id: ${spring.application.name}:${EUREKA_INSTANCE_HOSTNAME}
-
     non-secure-port-enabled: false
     secure-port-enabled: true
     secure-port: 443
-
     home-page-url: https://${eureka.instance.hostname}/
     status-page-url: https://${eureka.instance.hostname}/actuator/info
     health-check-url: https://${eureka.instance.hostname}/actuator/health
-
-    # ✅ Increased heartbeat interval — reduces noise on Cloud Run
     lease-renewal-interval-in-seconds: 30
     lease-expiration-duration-in-seconds: 90
-
-    # ✅ STARTING — prevents traffic before app is ready
     initial-status: STARTING
 
 # ══════════════════════════════════════════════════════════════════════════════
